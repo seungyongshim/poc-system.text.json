@@ -19,7 +19,7 @@ public static class MinimalApiJsonSerializerOptions
 
     internal static NullabilityInfoContext NullabilityInfoContext { get; } = new();
 
-    internal static void ThrowNullableRequired(JsonTypeInfo jsonTypeInfo, Func<string PropertyName, out Exception>? throwFunc)
+    internal static void ThrowNullableRequired(JsonTypeInfo jsonTypeInfo, Func<string PropertyName, out Exception>? throwFunc = null)
     {
         if (jsonTypeInfo.Kind != JsonTypeInfoKind.Object) return;
         throwFunc ??= (string prop) => new JsonException($"Not allow null to property: {prop}");
