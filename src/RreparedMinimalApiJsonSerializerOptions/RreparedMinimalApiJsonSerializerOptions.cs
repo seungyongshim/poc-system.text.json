@@ -13,13 +13,13 @@ public static class MinimalApiJsonSerializerOptions
         Converters = { new NullToDefaultConverter() },
         TypeInfoResolver = new DefaultJsonTypeInfoResolver
         {
-            Modifiers = { ThrowNullableRequired }
+            Modifiers = { info => ThrowNullableRequired(info) }
         }
     };
 
     internal static NullabilityInfoContext NullabilityInfoContext { get; } = new();
 
-    internal static void ThrowNullableRequired(JsonTypeInfo jsonTypeInfo, Func<string PropertyName, out Exception>? throwFunc = null)
+    internal static void ThrowNullableRequired(JsonTypeInfo jsonTypeInfo, Func<string, Exception>? throwFunc = null)
     {
         if (jsonTypeInfo.Kind != JsonTypeInfoKind.Object) return;
         throwFunc ??= (string prop) => new JsonException($"Not allow null to property: {prop}");
@@ -38,7 +38,7 @@ public static class MinimalApiJsonSerializerOptions
                         if(obj.GetType()?.GetRuntimeProperty(property.Name)?.GetValue(obj) is null)
                         { // 자동 구현 속성 초기값이 없다
 
-                            var nullabilityInfo = NullabilityInfoContext.Create(property.AttributeProvider as PropertyInfo);
+                            var nullabilityInfo = NullabilityInfoContext.Create(property.AttributeProvider is { } PropertyInfo v);
 
                             if (nullabilityInfo.WriteState is NullabilityState.NotNull)
                             {
