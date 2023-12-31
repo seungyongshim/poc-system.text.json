@@ -10,7 +10,6 @@ public static class MinimalApiJsonSerializerOptions
 {
     public static JsonSerializerOptions Default { get; } = new JsonSerializerOptions()
     {
-        Converters = { new NullToDefaultConverter() },
         TypeInfoResolver = new DefaultJsonTypeInfoResolver
         {
             Modifiers = { info => ThrowNullableRequired(info) }
@@ -57,68 +56,5 @@ public static class MinimalApiJsonSerializerOptions
                 };
             }
         }
-    }
-}
-
-public class NullToDefaultConverter : DefaultConverterFactory
-{
-    public override bool CanConvert(Type typeToConvert) => typeToConvert.IsValueType && Nullable.GetUnderlyingType(typeToConvert) == null;
-    protected sealed override bool HandleNull { get; } = true;
-    protected override T? Read<T>(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions modifiedOptions) where T : default =>
-        reader.TokenType switch
-        {
-            JsonTokenType.Null => default,
-            _ => base.Read<T>(ref reader, typeToConvert, modifiedOptions),
-        };
-}
-
-public abstract class DefaultConverterFactory : JsonConverterFactory
-{
-    // Adapted from this answer https://stackoverflow.com/a/65430421/3744182
-    // To https://stackoverflow.com/questions/65430420/how-to-use-default-serialization-in-a-custom-system-text-json-jsonconverter
-    class DefaultConverter<T> : JsonConverter<T>
-    {
-        readonly JsonSerializerOptions modifiedOptions;
-        readonly DefaultConverterFactory factory;
-
-        public DefaultConverter(JsonSerializerOptions modifiedOptions, DefaultConverterFactory factory) => (this.modifiedOptions, this.factory) = (modifiedOptions, factory);
-
-        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) => factory.Write(writer, value, modifiedOptions);
-        public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => factory.Read<T>(ref reader, typeToConvert, modifiedOptions);
-        public override bool CanConvert(Type typeToConvert) => typeof(T).IsAssignableFrom(typeToConvert);
-    }
-    class NullHandlingDefaultConverter<T> : DefaultConverter<T>
-    {
-        public NullHandlingDefaultConverter(JsonSerializerOptions modifiedOptions, DefaultConverterFactory factory) : base(modifiedOptions, factory) { }
-        public override bool HandleNull => true;
-    }
-
-    protected virtual JsonSerializerOptions ModifyOptions(JsonSerializerOptions options) =>
-        options.CopyAndRemoveConverter(GetType());
-
-    protected virtual T? Read<T>(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions modifiedOptions) =>
-        (T?)JsonSerializer.Deserialize(ref reader, typeToConvert, modifiedOptions);
-
-    protected virtual void Write<T>(Utf8JsonWriter writer, T value, JsonSerializerOptions modifiedOptions) =>
-        JsonSerializer.Serialize(writer, value, modifiedOptions);
-
-    public sealed override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
-    {
-        var converterType = (HandleNull ? typeof(NullHandlingDefaultConverter<>) : typeof(DefaultConverter<>)).MakeGenericType(typeToConvert);
-        return (JsonConverter)Activator.CreateInstance(converterType, new object[] { ModifyOptions(options), this })!;
-    }
-
-    protected virtual bool HandleNull { get; } = false;
-}
-
-public static class JsonSerializerExtensions
-{
-    public static JsonSerializerOptions CopyAndRemoveConverter(this JsonSerializerOptions options, Type converterType)
-    {
-        var copy = new JsonSerializerOptions(options);
-        for (var i = copy.Converters.Count - 1; i >= 0; i--)
-            if (copy.Converters[i].GetType() == converterType)
-                copy.Converters.RemoveAt(i);
-        return copy;
     }
 }
